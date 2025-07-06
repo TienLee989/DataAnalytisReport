@@ -1,0 +1,87 @@
+docker exec -it dataanalytisreport-kafka1-1 kafka-topics --create --topic salon-output --bootstrap-server dataanalytisreport-kafka1-1:9092,dataanalytisreport-kafka2-1:9093,dataanalytisreport-kafka3-1:9094 --partitions 3 --replication-factor 3
+
+docker exec -it dataanalytisreport-kafka1-1 kafka-topics --create --topic salon-output --bootstrap-server dataanalytisreport-kafka1-1:9092,dataanalytisreport-kafka2-1:9093,dataanalytisreport-kafka3-1:9094 --partitions 3 --replication-factor 3
+
+docker exec -it dataanalytisreport-kafka1-1 kafka-topics --bootstrap-server kafka1:9092,kafka2:9093,kafka3:9094 --list
+
+docker exec -it dataanalytisreport-kafka1-1 kafka-console-consumer --bootstrap-server localhost:9092 --topic salon-input --from-beginning
+
+----create master/worker----
+./start-master-worker.sh
+
+----
+python3 -m venv /home/tienlee/dataanalytis/venv
+source /home/tienlee/dataanalytis/venv/bin/activate
+python3 /home/tienlee/DataAnalytisReport/producer.py
+
+----run spark----
+spark-submit --master spark://192.168.162.130:7077 --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.2.1 spark-streaming-pipeline.py
+
+spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.2.1 \
+             --conf "spark.pyspark.python=/home/tienlee/dataanalytis/venv/bin/python" \
+             --conf "spark.pyspark.driver.python=/home/tienlee/dataanalytis/venv/bin/python" \
+             /home/tienlee/DataAnalytisReport/spark-streaming-pipeline.py
+
+----run UI-------
+streamlit run ui.py
+
+
+chmod +x ./start-master-worker.sh
+
+
+
+----stop----
+/opt/spark/sbin/stop-all.sh
+kill -9 [pid]
+rm -rf /opt/spark/logs/*
+--> ps -ef | grep spark
+
+
+
+
+
+---standalone spark SPARK_WORKER_INSTANCES config---
+B1: /opt/spark/conf/spark-env.sh
+# spark-env.sh
+# Đặt địa chỉ IP của Master để Worker có thể kết nối
+export SPARK_MASTER_HOST=192.168.162.130
+export SPARK_MASTER_PORT=7077
+export SPARK_MASTER_WEBUI_PORT=8080
+
+# Cấu hình số lượng Worker instances trên mỗi node
+# Trong trường hợp của bạn, bạn muốn 3 Worker trên một máy
+export SPARK_WORKER_INSTANCES=3
+
+# Cấu hình tài nguyên cho MỖI Worker instance
+# Tổng tài nguyên máy bạn là 4 Cores và khoảng 6.7 GB Memory (6860 MB)
+# Chia đều cho 3 Worker instances:
+# 4 Cores / 3 instances = ~1 core/instance
+# 6.7 GB / 3 instances = ~2.2 GB/instance
+export SPARK_WORKER_CORES=1     # Mỗi Worker instance sẽ sử dụng 1 Core
+export SPARK_WORKER_MEMORY=2G   # Mỗi Worker instance sẽ sử dụng 2 GB RAM
+
+# Cấu hình thư mục làm việc và thư mục log cho các Worker
+# Spark sẽ tự động tạo các thư mục con cho mỗi instance trong thư mục này
+export SPARK_WORKER_DIR=/tmp/spark-tienlee/workdir_multis
+export SPARK_LOG_DIR=/opt/spark/logs/multis_workers
+
+# Cổng Web UI cơ sở cho các Worker. Spark sẽ tự động tăng cổng
+# nếu có nhiều instances (ví dụ: 8081, 8082, 8083)
+# export SPARK_WORKER_WEBUI_PORT=8081 # Có thể bỏ qua dòng này để Spark tự chọn cổng
+# Nếu bạn muốn kiểm soát cụ thể, hãy để dòng này, và Spark sẽ cố gắng sử dụng 8081, 8082, 8083
+---
+B2: /opt/spark/conf/workers
+# conf/workers
+192.168.162.130
+B3: /opt/spark/sbin/start-all.sh
+
+---config spark using env python3--
+pip3 install pyspark pandas confluent-kafka scikit-learn pyarrow setuptools
+
+python3 -m venv /home/tienlee/dataanalytis/venv
+source /home/tienlee/dataanalytis/venv/bin/activate
+
+export SPARK_LOCAL_IP=192.168.162.130
+export PYSPARK_PYTHON=/home/tienlee/dataanalytis/venv_py39/bin/python
+export PYSPARK_DRIVER_PYTHON=/home/tienlee/dataanalytis/venv_py39/bin/python
+
