@@ -4,6 +4,30 @@
 
 Dự án này triển khai pipeline Spark Structured Streaming nhằm xử lý và dự đoán doanh thu salon theo thời gian thực từ Kafka, sau đó gửi kết quả dự đoán vào topic Kafka khác. Pipeline chạy trên cụm Spark Standalone.
 
+```bash
++----------------+       +-------------------+       +-----------------------+       +-----------------+
+| Kafka Producer | ----> | Kafka Cluster     | ----> | Spark Streaming App   | ----> | Kafka Cluster   | ----> | Kafka Consumer  |
+| (producer.py)  |       |   - Topic:        |       | (spark-streaming-     |       |  - Topic:       |       | (console/UI)    |
+|                |       |     salon-input   |       |     pipeline.py)      |       |     salon-output|       |                |
++----------------+       |   - Brokers:      |       | - Reads from Kafka    |       +-----------------+       +----------------+
+                        |     kafka1:9092   |       | - Parses JSON         |       | Multi-broker:   |
+                        |     kafka2:9093   |       | - Groups by Id_salon, |       | kafka1:9092     |
+                        |     kafka3:9094   |       |   create_date         |       | kafka2:9093     |
+                        +-------------------+       | - Applies Pandas UDF  |       | kafka3:9094     |
+                                                       |   (predict_revenue)   |       +-----------------+
+                                                       | - Writes to Kafka     |
+                                                       +-----------------------+
+                                                             | Spark Standalone  |
+                                                             | - Master: 192.168.162.130:7077 |
+                                                             | - Workers: 3 instances (2G each) |
+                                                             +-----------------------------+
+```
+
+* Kafka Producer: Gửi dữ liệu doanh thu salon theo thời gian thực vào topic salon-input.
+* Kafka Topics: Sử dụng multi-broker (kafka1, kafka2, kafka3) với các topic salon-input và salon-output, mỗi topic có 3 partitions và replication factor 3.
+* Spark Streaming App: Xử lý streaming data, áp dụng mô hình dự đoán qua Pandas UDF, và ghi kết quả vào salon-output.
+* Kafka Consumer: Hiển thị hoặc xử lý kết quả từ topic salon-output (console hoặc UI Streamlit).
+* Spark Standalone Cluster: Bao gồm 1 Master (192.168.162.130:7077) và 3 Worker instances.
 ## 2. Môi trường & Yêu cầu hệ thống
 
 * OS: Ubuntu/Linux
