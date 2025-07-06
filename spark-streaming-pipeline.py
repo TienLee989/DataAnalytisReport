@@ -104,7 +104,7 @@ def predict_revenue(salon_id: pd.Series, create_date: pd.Series, total: pd.Serie
     # Load real model or assign fake model only once per executor process.
     # This block ensures that the model is loaded/initialized only when needed on each executor.
     if _cached_model_instance is None:
-        model_path = "model.pkl" # This path must be accessible from all worker nodes/executors
+        model_path = "model/model.pkl" # This path must be accessible from all worker nodes/executors
 
         # print(f"DEBUG: Checking for model.pkl at {model_path} on executor.", file=sys.stderr)
         if os.path.exists(model_path):
